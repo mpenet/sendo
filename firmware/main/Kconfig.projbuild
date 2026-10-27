@@ -1,0 +1,36 @@
+# ABOUTME: menuconfig options for the LED string: data pin, length and colour order.
+# ABOUTME: Shown under "sendo" in `idf.py menuconfig`.
+
+menu "sendo"
+
+    config SENDO_LED_GPIO
+        int "LED data GPIO"
+        range 0 48
+        default 4
+        help
+            GPIO driving the 74AHCT125 level shifter in front of the LED data
+            line. GPIO4 avoids strapping, USB, UART0, PSRAM and on-board LED pins
+            on the ESP32-S3-DevKitC-1 (see docs/hardware.md).
+
+    config SENDO_LED_COUNT
+        int "Number of LEDs on the string"
+        range 1 1000
+        default 150
+        help
+            Pixels on the whole string, including unused ones. Three 50-pixel
+            strings for a MoonBoard Mini.
+
+    choice SENDO_LED_ORDER
+        prompt "LED colour order"
+        default SENDO_LED_ORDER_RGB
+        help
+            Order the pixels expect the colour bytes in. WS2811 strings differ:
+            if red and green are swapped on the board, pick the other one.
+
+        config SENDO_LED_ORDER_RGB
+            bool "RGB"
+        config SENDO_LED_ORDER_GRB
+            bool "GRB"
+    endchoice
+
+endmenu

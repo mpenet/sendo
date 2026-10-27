@@ -1,6 +1,7 @@
 # ABOUTME: Third-party ESP-IDF components used by the firmware, fetched by idf.py.
-# ABOUTME: Lua runs the Fennel-compiled logic; LittleFS holds it in the "assets" partition.
+# ABOUTME: Lua runs the Fennel-compiled logic; LittleFS holds it; led_strip drives the LEDs.
 dependencies:
   idf: ">=6.1"
   espressif/lua: "^5.5.1"
   joltwallet/littlefs: "^1.23.1"
+  espressif/led_strip: "^3.1.1"

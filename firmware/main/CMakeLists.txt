@@ -1,7 +1,7 @@
 # ABOUTME: Component definition for the firmware's main code.
 # ABOUTME: Also rebuilds the Lua bundle from fnl/ and packs it into the "assets" LittleFS image.
 
-idf_component_register(SRCS "main.c" "rx_log.c" "lua_runtime.c"
+idf_component_register(SRCS "main.c" "rx_log.c" "lua_runtime.c" "leds.c"
                        INCLUDE_DIRS "."
                        PRIV_REQUIRES bt nvs_flash esp_timer)
 

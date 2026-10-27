@@ -56,7 +56,8 @@ Every connection, grouped by net:
 
 - **GPIO4** carries LED data. It isn't a strapping pin (0, 3, 45, 46), USB
   (19, 20), UART0 (43, 44), octal flash/PSRAM (35–37) or the on-board RGB LED
-  (38 on v1.1 boards, 48 on v1.0).
+  (38 on v1.1 boards, 48 on v1.0). The pin, the LED count and the colour order
+  are set in menuconfig (see [firmware.md](firmware.md#led-settings)).
 - Keep the wire from the 74AHCT125 to the first pixel short, ideally under 1 m.
   Mount the controller near A1.
 - Most strings mark the data direction with an arrow. Data enters at the A1 end.

@@ -8,10 +8,10 @@ The protocol and board logic is written in Fennel and compiled to plain Lua at
 build time. The same code runs in the tests, in a terminal simulator and on the
 device.
 
-**Status:** the protocol core, simulator and firmware build are done. The
-firmware logs the app's Bluetooth writes and runs the core in a boot
-self-check; driving the LEDs comes next. Waiting for hardware to verify on a
-real board. See [docs/architecture.md](docs/architecture.md#status).
+**Status:** the protocol core, simulator and firmware are written. The
+firmware receives the app's Bluetooth writes, runs the core on them and drives
+the LED string. None of it has run on a real board yet: waiting for hardware.
+See [docs/architecture.md](docs/architecture.md#status).
 
 ## Documentation
 
@@ -26,6 +26,7 @@ real board. See [docs/architecture.md](docs/architecture.md#status).
 
 ```
 fnl/sendo/   firmware logic, compiled to Lua for the device
+  firmware   what the device runs: BLE events in, calls to the LED module out
   app        BLE events -> LED effects, one input state per connection
   stream     splits BLE writes into options and holds frames
   problem    interprets options ("D", "Z") and holds ("S5" -> start at 5)
@@ -34,7 +35,7 @@ fnl/sendo/   firmware logic, compiled to Lua for the device
   selfcheck  runs a fixed message through the core; printed at boot
 sim/         terminal simulator drawing the board
 test/        tests (*_test.fnl), runner and assertion helpers
-firmware/    ESP-IDF project for the ESP32-S3 (C: Bluetooth, Lua runtime)
+firmware/    ESP-IDF project for the ESP32-S3 (C: Bluetooth, Lua task, LED driver)
 docs/        documentation
 ```
 

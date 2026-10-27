@@ -1,10 +1,13 @@
-// ABOUTME: Firmware entry point: starts the Lua runtime, then poses as a MoonBoard LED box over BLE.
+// ABOUTME: Firmware entry point: poses as a MoonBoard LED box over BLE and hands writes to the Lua task.
 // ABOUTME: Exposes the Nordic UART Service and prints one "rx ..." line per write on the console.
 
 #include <stdio.h>
 #include <string.h>
 
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 #include "nvs_flash.h"
 
 #include "host/ble_hs.h"
@@ -14,8 +17,16 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
+#include "events.h"
 #include "lua_runtime.h"
 #include "rx_log.h"
+
+// Writes waiting for the Lua task. A problem is a handful of 20-byte writes.
+#define EVENT_QUEUE_LENGTH 16
+// Room for Lua's parser at startup plus the protocol core; stack-free is
+// printed at boot to tune it.
+#define LUA_TASK_STACK_BYTES 16384
+#define LUA_TASK_PRIORITY 5
 
 // Name of the original Moon LED box.
 #define DEVICE_NAME "Moonboard A"
@@ -33,12 +44,24 @@ static const ble_uuid128_t nus_tx_uuid = NUS_UUID(0x03);
 
 static uint8_t own_addr_type;
 static int connection_count = 0;
-
-// Runs the protocol logic; open for the life of the firmware. Lua is not
-// thread-safe: only one task may ever use this state.
-static lua_State *lua = NULL;
+static QueueHandle_t events;
 
 static void advertise(void);
+
+// Called from NimBLE's host task only, so one static event is safe.
+static void post_event(event_type_t type, uint16_t conn, const uint8_t *data, uint16_t len)
+{
+    static event_t event;
+    event.type = type;
+    event.conn = conn;
+    event.len = len;
+    if (len > 0) {
+        memcpy(event.data, data, len);
+    }
+    if (xQueueSend(events, &event, 0) != pdTRUE) {
+        printf("event-dropped conn=%u type=%d\n", conn, type);
+    }
+}
 
 static int nus_access(uint16_t conn_handle, uint16_t attr_handle,
                       struct ble_gatt_access_ctxt *ctxt, void *arg)
@@ -59,6 +82,7 @@ static int nus_access(uint16_t conn_handle, uint16_t attr_handle,
     if (rx_log_format(line, sizeof line, ms, conn_handle, data, len) > 0) {
         printf("%s\n", line);
     }
+    post_event(EVENT_RECEIVED, conn_handle, data, len);
     return 0;
 }
 
@@ -102,6 +126,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         printf("disconnect conn=%u reason=%d\n",
                event->disconnect.conn.conn_handle, event->disconnect.reason);
         connection_count--;
+        post_event(EVENT_DISCONNECTED, event->disconnect.conn.conn_handle, NULL, 0);
         advertise();
         return 0;
 
@@ -207,10 +232,12 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(err);
 
-    lua = lua_runtime_start();
-    if (lua != NULL) {
-        lua_runtime_selfcheck(lua);
-    }
+    // Queue and Lua task exist before Bluetooth starts, so no write is lost.
+    events = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(event_t));
+    assert(events != NULL);
+    BaseType_t created = xTaskCreate(lua_runtime_task, "lua", LUA_TASK_STACK_BYTES, events,
+                                     LUA_TASK_PRIORITY, NULL);
+    assert(created == pdPASS);
 
     ESP_ERROR_CHECK(nimble_port_init());
 

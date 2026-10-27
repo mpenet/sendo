@@ -6,12 +6,14 @@ the Fennel code, see [architecture.md](architecture.md); for wiring, see
 
 ## What it does today
 
-1. Mounts the `assets` LittleFS partition and starts Lua.
-2. Runs the boot self-check: a fixed message through the protocol core.
-3. Advertises over BLE as `Moonboard A` with the Nordic UART Service.
-4. Logs every write from the app, plus connection events, on the console.
+1. Starts a Lua task, which mounts the `assets` LittleFS partition, runs the
+   boot self-check, starts the LED driver and loads `sendo.firmware`.
+2. Advertises over BLE as `Moonboard A` with the Nordic UART Service.
+3. Logs every write from the app, plus connection events, on the console.
+4. Queues each write for the Lua task, which runs the protocol core and shows
+   the resulting problem on the LED string.
 
-It doesn't drive LEDs yet.
+None of this has run on hardware yet.
 
 ## Requirements
 
@@ -40,6 +42,16 @@ idf.py -p <port> flash monitor
 - **After editing `sdkconfig.defaults`**, delete `firmware/sdkconfig`. idf.py
   only applies the defaults when it generates a new one.
 
+## LED settings
+
+In `idf.py menuconfig`, menu **sendo**:
+
+| Option | Default | Notes |
+|---|---|---|
+| LED data GPIO | 4 | See [hardware.md](hardware.md#data-line) for why 4. |
+| Number of LEDs on the string | 150 | All pixels, including unused ones. The protocol core takes this count from the `leds` module, so it can't disagree. |
+| LED colour order | RGB | WS2811 strings differ. If red and green are swapped, pick GRB. |
+
 ## Flash layout
 
 From `firmware/partitions.csv`, 8 MB flash:
@@ -62,6 +74,7 @@ Pinned in `firmware/dependencies.lock`, fetched by idf.py into
 |---|---|---|
 | `espressif/lua` | 5.5.1 | Lua runtime, 32-bit numbers |
 | `joltwallet/littlefs` | 1.23.1 | Filesystem for the Lua bundle, image built at compile time |
+| `espressif/led_strip` | 3.1.1 | WS2811 driver over the RMT peripheral |
 
 ## Console output
 
@@ -73,18 +86,26 @@ are easy to grep.
 
 ```
 selfcheck leds=5 0:0,255,0 1:32,32,0 5:0,0,255 6:32,32,0 131:255,0,0 free-heap=…
+lua-ready firmware=yes stack-free=…
 ready name="Moonboard A"
 ```
 
-The `selfcheck` line must match `make bundle-check` on the host, apart from
-`free-heap`. `free-heap` is measured before Bluetooth starts, so the heap left
-at runtime is lower.
+The Lua task and Bluetooth start in parallel, so `ready` can appear before
+the Lua lines.
+
+- The `selfcheck` line must match `make bundle-check` on the host, apart from
+  `free-heap`.
+- `free-heap` is measured while Bluetooth is still starting, so the heap left
+  at runtime is lower.
+- `stack-free` is the Lua task's unused stack in bytes at that point. It shows
+  whether `LUA_TASK_STACK_BYTES` in `main.c` can shrink or must grow.
 
 ### Line reference
 
 | Line | Meaning |
 |---|---|
 | `selfcheck leds=<n> <led>:<r>,<g>,<b> … free-heap=<bytes>` | The protocol core ran on the device. |
+| `lua-ready firmware=<yes/no> stack-free=<bytes>` | The Lua task is waiting for writes. `no`: an error line above says why; writes are then only logged. |
 | `ready name="<name>"` | Bluetooth is up and advertising. |
 | `connect conn=<handle> status=<code>` | A phone connected (`status=0`) or a connection attempt failed. |
 | `disconnect conn=<handle> reason=<code>` | A phone disconnected. See the reason codes below. |
@@ -94,11 +115,15 @@ at runtime is lower.
 | `repeat-pairing conn=<handle>` | A phone that lost its bond paired again; the old bond was dropped. |
 | `rx ms=<uptime> conn=<handle> len=<n> hex=<bytes> text="<text>"` | One write from the app. `hex` is exact; in `text`, `\"`, `\\` and `\xHH` are escapes. |
 | `rx-error conn=<handle> reason=too-long` | A write over 512 bytes was rejected. |
+| `event-dropped conn=<handle> type=<0/1>` | The queue to the Lua task was full (16 events); a write (0) or disconnect (1) was lost. The parser resyncs on the next message. |
 | `adv-error step=<fields/response/start/address> rc=<code>` | Advertising couldn't start; the board is invisible. |
 | `ble-reset reason=<code>` | The Bluetooth stack reset itself. |
 | `lua-error step=mount err=<name>` | The `assets` partition didn't mount. |
 | `lua-error step=newstate` | Lua couldn't allocate its state. |
 | `lua-error step=selfcheck message="<error>"` | The Lua bundle failed to load or run. |
+| `lua-error step=firmware message="<error>"` | `sendo.firmware` failed to load; the LEDs won't follow the app. |
+| `lua-error step=<received/disconnected> message="<error>"` | The protocol core raised an error on one event. The task keeps running. |
+| `leds-error step=init err=<name>` | The LED driver couldn't start (check the GPIO setting). |
 
 Common disconnect reasons (NimBLE adds 0x200 to the Bluetooth error code):
 
@@ -148,3 +173,6 @@ compare the boards with the screenshots. Add confirmed messages to
 | The app doesn't list the board | Check for `ready`. Toggle the phone's Bluetooth. iOS caches names and services: forget the device and scan again. |
 | Phone connects then drops right away after a reflash | After `idf.py erase-flash`, the board lost its bonds while the phone kept them. Forget the device on the phone. (`idf.py flash` keeps the `nvs` partition and the bonds.) |
 | Changes in `sdkconfig.defaults` have no effect | Delete `firmware/sdkconfig` and rebuild. |
+| Wrong colours: red and green swapped | Set the colour order to GRB in menuconfig. |
+| Wrong holds light up | The string isn't wired in the app's order. Check [hardware.md](hardware.md#led-layout-on-the-board); map around detours with `:ledmap`. |
+| Nothing lights, but `rx` lines appear | Look for `lua-ready firmware=no` or `lua-error`. Then check power, the shared ground and the level shifter. |

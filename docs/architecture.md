@@ -13,12 +13,16 @@ drives a string of WS2811 LEDs.
  MoonBoard app ──BLE writes──▶ ESP32-S3
                                ┌──────────────────────────── C (ESP-IDF) ─┐
                                │ NimBLE: Nordic UART Service              │
-                               │ LittleFS "assets" partition              │
-                               │ Lua 5.5 runtime                          │
+                               │   │ queue                                │
+                               │   ▼                                      │
+                               │ Lua task (Lua 5.5, modules from LittleFS)│
                                │   ┌──────── Lua compiled from Fennel ─┐  │
-                               │   │ stream → problem → app → render   │  │
+                               │   │ firmware → app → stream, problem, │  │
+                               │   │                  render           │  │
                                │   └───────────────────────────────────┘  │
-                               │ RMT LED driver (planned)                 │
+                               │   │ leds module                          │
+                               │   ▼                                      │
+                               │ led_strip RMT driver, GPIO4              │
                                └──────────────────────────────────────────┘
                                           │
                                           ▼
@@ -63,9 +67,17 @@ what an effect means: the firmware will write the LEDs, the simulator draws a
 board, the tests compare values. The same events always produce the same
 effects, so a recorded log of events replays exactly.
 
-`sendo.selfcheck` runs a fixed message through `app` and summarises the
-result. The firmware prints it at boot so the whole chain is verified on the
-device.
+Two modules sit on top for the device:
+
+- `sendo.firmware` is what the firmware runs. `(firmware.start leds)` returns
+  `{:received (fn [conn bytes]) :disconnected (fn [conn])}`. It turns each
+  `{:leds …}` effect into `leds.clear()`, `leds.set(i, r, g, b)` per lit LED,
+  and `leds.show()`. It takes the LED count from `leds.count`, so the core
+  can't address LEDs the string doesn't have. The `leds` module is the C one on
+  the device and a fake in tests.
+- `sendo.selfcheck` runs a fixed message through `app` and summarises the
+  result. The firmware prints it at boot, so the whole chain is verified on the
+  device.
 
 ## Build pipeline
 
@@ -108,11 +120,24 @@ firmware opens.
 
 Lua is not thread-safe: one `lua_State` must only ever be used by one task.
 
-- **Now:** the main task creates the state and runs the self-check before
-  Bluetooth starts. BLE callbacks run on NimBLE's host task and only log.
-- **Next step:** BLE callbacks copy each write into a FreeRTOS queue. A
-  dedicated Lua task owns the state, drains the queue, calls `app.handle` and
-  applies the effects. Calling Lua directly from a BLE callback would be a bug.
+```
+NimBLE host task                         Lua task (owns the only lua_State)
+  write callback ─▶ log "rx …"
+                 ─▶ event queue (16) ─▶  firmware.received(conn, bytes)
+  disconnect     ─▶ event queue      ─▶  firmware.disconnected(conn)
+                                          └─▶ leds.clear / set / show ─▶ RMT
+```
+
+- The queue and the Lua task are created before Bluetooth starts, so early
+  writes wait in the queue instead of being lost.
+- The Lua task creates the state, runs the self-check, starts the LED driver,
+  loads `sendo.firmware` and then blocks on the queue.
+- It runs at a lower priority than NimBLE: Bluetooth always comes first.
+- An error in one event is logged and the task carries on.
+- If the queue is full, the BLE callback drops the event and logs it; the
+  parser resyncs on the next message.
+
+Calling Lua directly from a BLE callback would be a bug.
 
 ## Testing strategy
 
@@ -121,7 +146,7 @@ Lua is not thread-safe: one `lua_State` must only ever be used by one task.
 | Protocol core | Example tests per module | `make test` |
 | Parser robustness | Property tests: random chunking, random garbage, resync; 500 runs each, fixed seeds. Checked against deliberately broken parsers to prove they catch bugs. | `make test` |
 | Device number model | Whole suite on 32-bit Lua | `make test32` |
-| Compiled bundle | Lua output run without Fennel, device libraries only | `make bundle-check` |
+| Compiled bundle | The calls `lua_runtime.c` makes, on 32-bit Lua without Fennel, device libraries only, with a fake `leds` module | `make bundle-check` |
 | Firmware C | Host tests with AddressSanitizer and UBSan | `make firmware-test` |
 | Firmware build | 0 compiler warnings | `idf.py build` |
 | On hardware | Self-check line at boot; captures from the real app | see [firmware.md](firmware.md) |
@@ -150,7 +175,7 @@ New behaviour is written test-first: a failing test, then the code.
 | 3 | Protocol core in Fennel | Done |
 | 4 | Simulator | Terminal simulator done; live bridge from the board not started |
 | 5 | Lua on the device | Built with a boot self-check; waiting for hardware |
-| 6 | LEDs on the bench | Not started: RMT driver and Lua task |
+| 6 | LEDs on the bench | Lua task, event queue and LED driver built; waiting for hardware |
 | 7 | Installed on the wall | Not started |
 | 8 | Hardening: watchdog, A/B bundle with rollback, config in NVS | Not started |
 | 9 | CI and hardware-in-the-loop tests | Not started |

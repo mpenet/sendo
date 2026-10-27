@@ -44,9 +44,9 @@ bundle:
 	done
 
 # Run the compiled bundle the way the firmware does: 32-bit Lua, no Fennel,
-# only the base, package, math, string and table libraries.
+# only the base, package, math, string and table libraries, a fake LED module.
 bundle-check: bundle $(LUA32)
-	$(LUA32) -e 'io, os, debug, utf8, coroutine = nil; package.path = "$(BUNDLE_DIR)/?.lua"; print(require("sendo.selfcheck").run())'
+	$(LUA32) test/bundle_check.lua $(BUNDLE_DIR)
 
 firmware-test:
 	mkdir -p firmware/build-host
