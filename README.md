@@ -14,6 +14,7 @@ fnl/sendo/   firmware logic
   stream     splits BLE writes into options and holds frames
   problem    interprets options ("D", "Z") and holds ("S5" -> start at 5)
   grid       hold index <-> grid cell / name ("A1".."K12")
+  render     holds -> lit LEDs: colours, mapping, lights above, power limit
 test/        tests (*_test.fnl), runner and assertion helpers
 docs/        protocol reference
 ```

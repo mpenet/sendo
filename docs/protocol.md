@@ -94,6 +94,9 @@ column, dimmed (yellow in one firmware, white in the other).
 - No extra LED for end holds.
 - Hold LEDs take priority over extra LEDs.
 
+sendo skips only the top row, which has no position above. Skipping the
+bottom row has no evident reason in either firmware.
+
 ## Parser behaviour (assumed)
 
 - Message boundaries come only from the bytes. Write boundaries are ignored.
