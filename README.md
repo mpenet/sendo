@@ -5,7 +5,8 @@ The official MoonBoard app connects to it over BLE and lights the holds of the
 selected problem.
 
 The protocol and board logic is pure Fennel and runs identically on a laptop
-and on the ESP32. See [docs/protocol.md](docs/protocol.md).
+and on the ESP32. See [docs/protocol.md](docs/protocol.md) for the app protocol
+and [docs/hardware.md](docs/hardware.md) for parts and wiring.
 
 ## Layout
 
@@ -18,7 +19,7 @@ fnl/sendo/   firmware logic
   render     holds -> lit LEDs: colours, mapping, lights above, power limit
 sim/         host simulator drawing the board in the terminal
 test/        tests (*_test.fnl), runner and assertion helpers
-docs/        protocol reference
+docs/        app protocol and hardware reference
 ```
 
 ## Development
