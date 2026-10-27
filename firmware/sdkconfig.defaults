@@ -1,0 +1,19 @@
+# ABOUTME: Build configuration for the sendo firmware, applied on top of ESP-IDF's defaults.
+# ABOUTME: idf.py generates the full sdkconfig from this file.
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# ESP32-S3-DevKitC-1-N8R8: 8 MB flash.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# BLE only, through the NimBLE host.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+
+# The app supports several users connected at once.
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=3
+
+# Keep bonds across reboots. A phone that bonded keeps its keys; if the board
+# forgot them, the phone's encrypted reconnect fails until the user unpairs.
+CONFIG_BT_NIMBLE_NVS_PERSIST=y

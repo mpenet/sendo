@@ -1,0 +1,11 @@
+# ESP-IDF build output and the config generated from sdkconfig.defaults
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/managed_components/
+
+# Serial monitor session logs
+firmware/log.*.txt
+
+# Host builds of firmware tests
+firmware/build-host/
