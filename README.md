@@ -16,6 +16,7 @@ fnl/sendo/   firmware logic
   problem    interprets options ("D", "Z") and holds ("S5" -> start at 5)
   grid       hold index <-> grid cell / name ("A1".."K12")
   render     holds -> lit LEDs: colours, mapping, lights above, power limit
+sim/         host simulator drawing the board in the terminal
 test/        tests (*_test.fnl), runner and assertion helpers
 docs/        protocol reference
 ```
@@ -27,4 +28,5 @@ Requires Fennel and Lua 5.5.
 ```sh
 make test   # run the test suite
 make lint   # run fennel-ls
+make sim < sim/samples.txt   # one BLE write per line, draws each result
 ```

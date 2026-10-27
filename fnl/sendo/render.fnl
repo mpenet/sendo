@@ -21,8 +21,11 @@
             :end [255 0 0]
             :above [32 32 0]}})
 
+(fn led-index [config index]
+  (or (?. config :ledmap index) index))
+
 (fn led-for [config index]
-  (let [led (or (?. config :ledmap index) index)]
+  (let [led (led-index config index)]
     (when (and (<= 0 led) (< led config.led-count))
       led)))
 
@@ -68,4 +71,4 @@
          (apply-brightness config)
          (limit-current config))))
 
-{: defaults : render}
+{: defaults : led-index : render}
