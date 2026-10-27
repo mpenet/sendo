@@ -102,3 +102,14 @@ The same `make` targets work without Docker if Fennel 1.6.1 (as a Lua
 script), Lua 5.5, fennel-ls and a C compiler are installed. `make test32`
 then downloads and builds the 32-bit Lua in `build/` on first use.
 
+## License
+
+sendo is licensed under the GNU General Public License v3.0 only
+(SPDX: `GPL-3.0-only`). See [LICENSE](LICENSE).
+
+The firmware links third-party components under their own licences, all
+compatible with the GPLv3: ESP-IDF, NimBLE and led_strip (Apache-2.0), Lua and
+esp_littlefs (MIT).
+
+sendo is not affiliated with or endorsed by Moon Climbing, maker of the
+MoonBoard and its app.
