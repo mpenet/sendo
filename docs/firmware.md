@@ -15,32 +15,59 @@ the Fennel code, see [architecture.md](architecture.md); for wiring, see
 
 None of this has run on hardware yet.
 
-## Requirements
-
-- ESP-IDF v6.1, installed for the ESP32-S3 (see the README).
-- `make` and Fennel on the `PATH`: `idf.py build` runs `make bundle`.
-  Developed with Fennel 1.6.1, installed as a Lua script (`make test32` runs
-  that script with a different Lua, so a standalone Fennel binary won't do).
-- An ESP32-S3-DevKitC-1-N8R8.
-
 ## Build and flash
 
+Set up once as in the [README](../README.md#installation): Docker and esptool.
+Then:
+
 ```sh
-source ~/esp/esp-idf/export.fish   # once per shell (export.sh for bash/zsh)
-cd firmware
-idf.py build
-idf.py -p <port> flash monitor
+scripts/in-docker make firmware        # build in the image
+make flash PORT=<port>                 # flash on the host
+make monitor PORT=<port>               # console; exit with Ctrl+]
 ```
 
 - **Port:** the DevKitC has two USB-C ports. Use the one labelled **UART**; it
-  appears as `/dev/cu.usbserial-…` or `/dev/cu.wchusbserial…` on macOS
-  (`ls /dev/cu.*` before and after plugging in).
+  appears as `/dev/cu.usbserial-…` or `/dev/cu.wchusbserial…` on macOS and
+  `/dev/ttyUSB0` or `/dev/ttyACM0` on Linux (list the devices before and after
+  plugging in).
+- **Building and flashing are split** because Docker Desktop on macOS can't
+  reach USB devices. `make flash` runs esptool with `firmware/build/flash_args`,
+  which lists every image: bootloader, partition table, app and the `assets`
+  partition with the Lua.
+- **`make monitor`** is a plain serial terminal. For ESP-IDF's monitor, which
+  decodes crash backtraces, use `idf.py monitor` from a native install, or from
+  the image on Linux with the device passed through
+  (`docker run --device /dev/ttyUSB0 …`).
+- **After editing `sdkconfig.defaults`**, delete `firmware/sdkconfig`. idf.py
+  only applies the defaults when it generates a new one.
+
+### Without Docker
+
+Install ESP-IDF v6.1 for the ESP32-S3 (about 5 GB in `~/esp` and
+`~/.espressif`):
+
+```sh
+git clone --depth 1 --branch v6.1 --recursive --shallow-submodules \
+  https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+~/esp/esp-idf/install.sh esp32s3
+```
+
+Fennel 1.6.1 (installed as a Lua script, not a standalone binary), Lua 5.5 and
+`make` must be on the `PATH`, since the build runs `make bundle`. Then:
+
+```sh
+source ~/esp/esp-idf/export.fish   # once per shell (export.sh for bash/zsh)
+make firmware
+idf.py -C firmware -p <port> flash monitor
+```
+
 - **Always flash with `idf.py flash`.** It writes the app *and* the `assets`
   partition with the Lua. `idf.py app-flash` writes the app only and leaves old
   or missing Lua behind.
-- **Exit the monitor** with Ctrl+].
-- **After editing `sdkconfig.defaults`**, delete `firmware/sdkconfig`. idf.py
-  only applies the defaults when it generates a new one.
+- A build directory can't be shared between a Docker and a native build: they
+  use different ESP-IDF paths and CMake generators. When switching, delete
+  `firmware/build` (generated, ignored by git). `idf.py fullclean` refuses to
+  clean such a mixed directory.
 
 ## LED settings
 
@@ -166,7 +193,9 @@ compare the boards with the screenshots. Add confirmed messages to
 
 | Symptom | Cause and fix |
 |---|---|
-| `make: fennel: No such file or directory` during `idf.py build` | Fennel isn't on the `PATH` of the shell running idf.py. Install it or fix `PATH`. |
+| `make: fennel: No such file or directory` during a native `idf.py build` | Fennel isn't on the `PATH` of the shell running idf.py. Install it, fix `PATH`, or build with `scripts/in-docker make firmware`. |
+| CMake error about a different generator or source directory | `firmware/build` comes from the other kind of build (Docker or native). Delete `firmware/build` and rebuild. |
+| `make flash`: `Could not open <port>` | Wrong port, or another program (a monitor) has it open. |
 | `lua-error step=mount` | The `assets` partition was never written. Flash with `idf.py flash`, not `app-flash`. |
 | `lua-error step=selfcheck message="module 'sendo.…' not found"` | Stale or partial assets. Rebuild and `idf.py flash`. |
 | No `ready` line, or `adv-error` | Bluetooth didn't start; check the lines just before. `idf.py fullclean` then rebuild if the config changed. |

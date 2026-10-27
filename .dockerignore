@@ -1,0 +1,4 @@
+# The image only needs these; the repo is mounted at run time.
+*
+!Dockerfile
+!scripts/docker-entrypoint

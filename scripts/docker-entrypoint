@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# ABOUTME: Entry point of the sendo build image: sets up ESP-IDF's environment, then runs the command.
+# ABOUTME: Keeps ESP-IDF's setup banner out of the command's output; shows it only if setup fails.
+set -e
+
+log=/tmp/idf-export.log
+if ! . "$IDF_PATH/export.sh" > "$log" 2>&1; then
+    cat "$log" >&2
+    exit 1
+fi
+
+exec "$@"

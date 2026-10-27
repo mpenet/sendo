@@ -1,0 +1,27 @@
+#!/bin/sh
+# ABOUTME: Runs a command in the sendo build image, with the repo mounted at the same path as on the host.
+# ABOUTME: Usage: scripts/in-docker make check firmware   (builds or updates the image first)
+set -eu
+
+image=sendo-build
+repo=$(cd "$(dirname "$0")/.." && pwd)
+
+# Cached after the first build; rebuilds only when the Dockerfile changed.
+# The output only matters when the build fails.
+if ! build_log=$(docker build --quiet --tag "$image" "$repo" 2>&1); then
+    echo "$build_log" >&2
+    exit 1
+fi
+
+# Stdin is always passed through (make sim < file); a terminal only when there is one.
+tty=
+if [ -t 0 ] && [ -t 1 ]; then
+    tty=--tty
+fi
+
+# Same path inside and out: error messages and build caches use host paths.
+# Running as the host user keeps files in the repo owned by you.
+exec docker run --rm --interactive $tty \
+    --user "$(id -u):$(id -g)" --env HOME=/tmp \
+    --volume "$repo:$repo" --workdir "$repo" \
+    "$image" "$@"

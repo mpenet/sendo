@@ -39,40 +39,66 @@ firmware/    ESP-IDF project for the ESP32-S3 (C: Bluetooth, Lua task, LED drive
 docs/        documentation
 ```
 
+## Installation
+
+Everything needed to build lives in a Docker image: ESP-IDF v6.1, Lua 5.5.1
+(standard and 32-bit), Fennel 1.6.1 and fennel-ls, all at pinned versions. The
+host only needs Docker, to build, and esptool, to flash over USB.
+
+1. Install [Docker](https://docs.docker.com/get-started/get-docker/)
+   (Docker Desktop on macOS and Windows).
+2. Install esptool 5 or later, with pyserial's serial monitor. Any one of:
+
+   ```sh
+   uv tool install --with-executables-from pyserial 'esptool>=5'
+   pipx install --include-deps 'esptool>=5'
+   python3 -m pip install --user 'esptool>=5'
+   ```
+
+   Check with `esptool version`. Without the version constraint, some
+   installers pick esptool 4, which only provides `esptool.py`.
+
+3. Clone the repository and build:
+
+   ```sh
+   git clone <repo-url> sendo && cd sendo
+   scripts/in-docker make check firmware
+   ```
+
+   The first run builds the image: it downloads about 4 GB (13 GB on disk,
+   mostly Espressif's toolchains) and takes a few minutes. Later runs start in
+   seconds.
+
+4. Plug the board's **UART** USB port in, find its port (`ls /dev/cu.*` on
+   macOS, `ls /dev/ttyUSB* /dev/ttyACM*` on Linux), then flash and watch the
+   console:
+
+   ```sh
+   make flash PORT=/dev/cu.usbserial-110
+   make monitor PORT=/dev/cu.usbserial-110   # exit with Ctrl+]
+   ```
+
+The first lines should include the self-check and `ready name="Moonboard A"`.
+See [docs/firmware.md](docs/firmware.md) for the console output and
+troubleshooting, and for building without Docker.
+
 ## Development
 
-Requires Fennel (1.6.1, installed as a Lua script), Lua 5.5 and a C compiler.
+Run any task in the image with `scripts/in-docker <command>`:
 
 ```sh
-make test                    # run the test suite
-make test32                  # same suite on Lua built like the firmware's (32-bit numbers)
-make lint                    # run fennel-ls
-make sim < sim/samples.txt   # one BLE write per line, draws each result
-make bundle-check            # compile fnl/ to Lua and run it like the firmware does
-make firmware-test           # host tests for the firmware's C code
+scripts/in-docker make check                      # every host-side check below
+scripts/in-docker make test                       # run the test suite
+scripts/in-docker make test32                     # same suite on 32-bit Lua, like the firmware's
+scripts/in-docker make lint                       # run fennel-ls
+scripts/in-docker make bundle-check               # compile fnl/ to Lua and run it like the firmware does
+scripts/in-docker make firmware-test              # host tests for the firmware's C code
+scripts/in-docker make firmware                   # build the firmware
+scripts/in-docker make sim < sim/samples.txt      # one BLE write per line, draws each result
+scripts/in-docker idf.py -C firmware menuconfig   # LED pin, count and colour order
 ```
 
-`make test32` and `make bundle-check` download Lua 5.5.1 from lua.org once,
-check its SHA-256 and build it in `build/`.
+The same `make` targets work without Docker if Fennel 1.6.1 (as a Lua
+script), Lua 5.5, fennel-ls and a C compiler are installed. `make test32`
+then downloads and builds the 32-bit Lua in `build/` on first use.
 
-## Firmware
-
-Install ESP-IDF v6.1 for the ESP32-S3 once:
-
-```sh
-git clone --depth 1 --branch v6.1 --recursive --shallow-submodules \
-  https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-~/esp/esp-idf/install.sh esp32s3
-```
-
-Build and flash:
-
-```sh
-source ~/esp/esp-idf/export.fish   # once per shell (export.sh for bash/zsh)
-cd firmware
-idf.py build
-idf.py -p <port> flash monitor
-```
-
-See [docs/firmware.md](docs/firmware.md) for the port, the console output and
-troubleshooting.
