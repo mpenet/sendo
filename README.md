@@ -1,42 +1,62 @@
 # sendo
 
-Firmware for a DIY MoonBoard Mini LED system on ESP32, written in Fennel.
-The official MoonBoard app connects to it over BLE and lights the holds of the
+Firmware for a DIY MoonBoard Mini LED system on an ESP32-S3. The official
+MoonBoard app connects to it over Bluetooth and lights the holds of the
 selected problem.
 
-The protocol and board logic is pure Fennel and runs identically on a laptop
-and on the ESP32. See [docs/protocol.md](docs/protocol.md) for the app protocol
-and [docs/hardware.md](docs/hardware.md) for parts and wiring.
+The protocol and board logic is written in Fennel and compiled to plain Lua at
+build time. The same code runs in the tests, in a terminal simulator and on the
+device.
+
+**Status:** the protocol core, simulator and firmware build are done. The
+firmware logs the app's Bluetooth writes and runs the core in a boot
+self-check; driving the LEDs comes next. Waiting for hardware to verify on a
+real board. See [docs/architecture.md](docs/architecture.md#status).
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | How it fits together, build pipeline, testing, decisions, status |
+| [docs/protocol.md](docs/protocol.md) | What the MoonBoard app sends and how sendo interprets it |
+| [docs/hardware.md](docs/hardware.md) | Parts, wiring, power, LED layout and hole geometry |
+| [docs/firmware.md](docs/firmware.md) | Building, flashing, console output, capture sessions, troubleshooting |
 
 ## Layout
 
 ```
-fnl/sendo/   firmware logic
+fnl/sendo/   firmware logic, compiled to Lua for the device
   app        BLE events -> LED effects, one input state per connection
   stream     splits BLE writes into options and holds frames
   problem    interprets options ("D", "Z") and holds ("S5" -> start at 5)
   grid       hold index <-> grid cell / name ("A1".."K12")
   render     holds -> lit LEDs: colours, mapping, lights above, power limit
-sim/         host simulator drawing the board in the terminal
-firmware/    ESP-IDF project for the ESP32-S3 (currently: BLE sniffer logging app writes)
+  selfcheck  runs a fixed message through the core; printed at boot
+sim/         terminal simulator drawing the board
 test/        tests (*_test.fnl), runner and assertion helpers
-docs/        app protocol and hardware reference
+firmware/    ESP-IDF project for the ESP32-S3 (C: Bluetooth, Lua runtime)
+docs/        documentation
 ```
 
 ## Development
 
-Requires Fennel and Lua 5.5.
+Requires Fennel (1.6.1, installed as a Lua script), Lua 5.5 and a C compiler.
 
 ```sh
-make test   # run the test suite
-make lint   # run fennel-ls
+make test                    # run the test suite
+make test32                  # same suite on Lua built like the firmware's (32-bit numbers)
+make lint                    # run fennel-ls
 make sim < sim/samples.txt   # one BLE write per line, draws each result
+make bundle-check            # compile fnl/ to Lua and run it like the firmware does
 make firmware-test           # host tests for the firmware's C code
 ```
 
-### Firmware
+`make test32` and `make bundle-check` download Lua 5.5.1 from lua.org once,
+check its SHA-256 and build it in `build/`.
 
-Requires ESP-IDF v6.1:
+## Firmware
+
+Install ESP-IDF v6.1 for the ESP32-S3 once:
 
 ```sh
 git clone --depth 1 --branch v6.1 --recursive --shallow-submodules \
@@ -44,24 +64,14 @@ git clone --depth 1 --branch v6.1 --recursive --shallow-submodules \
 ~/esp/esp-idf/install.sh esp32s3
 ```
 
-Then:
+Build and flash:
 
 ```sh
 source ~/esp/esp-idf/export.fish   # once per shell (export.sh for bash/zsh)
 cd firmware
 idf.py build
-idf.py -p <port> flash monitor     # port: ls /dev/cu.* with the board's UART USB port plugged in
+idf.py -p <port> flash monitor
 ```
 
-After editing `sdkconfig.defaults`, delete `firmware/sdkconfig`. idf.py only
-applies the defaults when it generates a new one.
-
-The sniffer advertises as `Moonboard A`. Connect from the MoonBoard app and
-send problems; each write is logged as one line:
-
-```
-rx ms=1234 conn=1 len=6 hex=6c2353352c45 text="l#S5,E"
-```
-
-To save a session, press Ctrl+T then Ctrl+L in the monitor. It writes
-`log.sendo.<timestamp>.txt` in `firmware/`; the same keys stop logging.
+See [docs/firmware.md](docs/firmware.md) for the port, the console output and
+troubleshooting.

@@ -1,0 +1,7 @@
+# ABOUTME: Flash layout for the 8 MB ESP32-S3: firmware app plus a LittleFS partition for the Lua bundle.
+# ABOUTME: "assets" is built from firmware/assets/ and flashed with the app.
+# Name,   Type, SubType,  Offset,  Size,  Flags
+nvs,      data, nvs,      0x9000,  0x6000,
+phy_init, data, phy,      0xf000,  0x1000,
+factory,  app,  factory,  0x10000, 2M,
+assets,   data, littlefs, ,        1M,

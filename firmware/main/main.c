@@ -1,4 +1,4 @@
-// ABOUTME: Sniffer firmware: poses as a MoonBoard LED box over BLE and logs every write from the app.
+// ABOUTME: Firmware entry point: starts the Lua runtime, then poses as a MoonBoard LED box over BLE.
 // ABOUTME: Exposes the Nordic UART Service and prints one "rx ..." line per write on the console.
 
 #include <stdio.h>
@@ -14,6 +14,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
+#include "lua_runtime.h"
 #include "rx_log.h"
 
 // Name of the original Moon LED box.
@@ -32,6 +33,10 @@ static const ble_uuid128_t nus_tx_uuid = NUS_UUID(0x03);
 
 static uint8_t own_addr_type;
 static int connection_count = 0;
+
+// Runs the protocol logic; open for the life of the firmware. Lua is not
+// thread-safe: only one task may ever use this state.
+static lua_State *lua = NULL;
 
 static void advertise(void);
 
@@ -201,6 +206,11 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+
+    lua = lua_runtime_start();
+    if (lua != NULL) {
+        lua_runtime_selfcheck(lua);
+    }
 
     ESP_ERROR_CHECK(nimble_port_init());
 

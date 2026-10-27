@@ -1,8 +1,14 @@
+# Host tool builds (32-bit Lua for make test32)
+/build/
+
 # ESP-IDF build output and the config generated from sdkconfig.defaults
 firmware/build/
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/managed_components/
+
+# Lua compiled from fnl/ by make bundle
+firmware/assets/
 
 # Serial monitor session logs
 firmware/log.*.txt

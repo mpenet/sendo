@@ -52,6 +52,11 @@
     (is= [] (receive state 1 "#"))
     (is= [{:leds {0 colors.start}}] (receive state 1 "l#S0#")))
 
+ ;; Too big for a 32-bit integer: parses as a float on the firmware's Lua.
+ :huge-hold-indices-are-skipped
+ #(is= [{:leds {0 colors.start}}]
+       (receive (app.init render.defaults) 1 "l#S99999999999,S2147483648,S0#"))
+
  :garbage-has-no-effect
  #(is= [] (receive (app.init render.defaults) 1 "hello"))
 
