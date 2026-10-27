@@ -11,6 +11,7 @@ and on the ESP32. See [docs/protocol.md](docs/protocol.md).
 
 ```
 fnl/sendo/   firmware logic
+  app        BLE events -> LED effects, one input state per connection
   stream     splits BLE writes into options and holds frames
   problem    interprets options ("D", "Z") and holds ("S5" -> start at 5)
   grid       hold index <-> grid cell / name ("A1".."K12")
