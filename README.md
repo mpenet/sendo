@@ -1,4 +1,4 @@
-# sendo
+# sendō
 
 Firmware for a DIY MoonBoard Mini LED system on an ESP32-S3. The official
 MoonBoard app connects to it over Bluetooth and lights the holds of the
